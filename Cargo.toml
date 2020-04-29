@@ -1,0 +1,14 @@
+[package]
+name = "forceu8exe"
+version = "0.1.0"
+authors = ["Tatsunori Uchino <tats.u@live.jp>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+colored = "1.9"
+which = "3.1.1"
+clap = "2.33.0"
+tempfile = "3"
+
