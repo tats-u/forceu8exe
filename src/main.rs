@@ -89,12 +89,20 @@ fn main() {
                 .write_all(generate_manifest(exestem.as_ref()).as_bytes())
                 .unwrap();
         }
+        // No manifest -> 31 / valid manifest exists -> 0
+        let validate_manifest_status = Command::new("mt")
+            .args(&["-nologo", 
+                &format!("-inputresource:{}", &exepath.to_string_lossy()),
+                "-validate_manifest"
+            ])
+            .status().unwrap();
+        let action = if validate_manifest_status.success() { "update" } else { "output"} ;
         let mut embed_manifest_result = Command::new("mt")
             .args(&[
                 "-nologo",
                 "-manifest",
                 &manifest_filepath.to_string_lossy(),
-                &format!("-updateresource:{};#1", &exepath.to_string_lossy()),
+                &format!("-{}resource:{}", &action, &exepath.to_string_lossy()),
             ])
             .spawn();
         match embed_manifest_result {
