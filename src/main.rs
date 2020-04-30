@@ -96,7 +96,10 @@ fn main() {
                 "-validate_manifest"
             ])
             .status().unwrap();
-        let action = if validate_manifest_status.success() { "update" } else { "output"} ;
+        let action = if validate_manifest_status.success() { "update" } else {
+            eprintln!("{}: no valid manifest is found in this executable.  Embedding a manifest as the first....", "note".green());
+            "output"
+        };
         let mut embed_manifest_result = Command::new("mt")
             .args(&[
                 "-nologo",
