@@ -2,14 +2,14 @@ use clap::{App, Arg, SubCommand};
 use colored::*;
 use std::ffi::OsStr;
 use std::fs::File;
+use std::io::Write;
 use std::option::Option;
 use std::path::Path;
 use std::process::exit;
 use std::process::Command;
 use tempfile::tempdir;
 use which::which;
-
-use std::io::Write;
+use xml::escape::escape_str_attribute;
 
 fn generate_manifest(exename: &str) -> String {
     return String::from(format!(
@@ -23,7 +23,7 @@ fn generate_manifest(exename: &str) -> String {
   </application>
 </assembly>
 "#,
-        exename
+        escape_str_attribute(exename)
     ));
 }
 
@@ -36,7 +36,7 @@ fn extract_exename_from_path(exepath: &Path) -> Option<std::borrow::Cow<'_, str>
     return if exepath.extension().unwrap_or_default() == "exe" {
         exepath.file_stem().and_then(|s| Some(s.to_string_lossy()))
     } else {
-        Some(exepath.to_string_lossy())
+        exepath.file_name().and_then(|s| Some(s.to_string_lossy()))
     };
 }
 
