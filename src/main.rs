@@ -7,6 +7,7 @@ use std::process::exit;
 use std::process::Command;
 use tempfile::tempdir;
 use which::which;
+use std::option::Option;
 
 use std::io::Write;
 
@@ -24,6 +25,15 @@ fn generate_manifest(exename: &str) -> String {
 "#,
         exename
     ));
+}
+
+fn create_manifest_file(outpath: &Path, exename: &str) -> Result<(), std::io::Error> {
+    let manifest = File::create(outpath);
+    return manifest.and_then(|mut m| m.write_all(generate_manifest(exename).as_bytes()))
+}
+
+fn extract_exename_from_path(exepath: &Path) -> Option<std::borrow::Cow<'_, str>>  {
+    return exepath.file_stem().and_then(|s| Some(s.to_string_lossy()));
 }
 
 fn main() {
@@ -57,7 +67,7 @@ fn main() {
         );
         exit(1);
     }
-    if let Some(matches) = matches.subcommand_matches("apply") {
+    if let Some(ref matches) = matches.subcommand_matches("apply") {
         let exepath = Path::new(matches.value_of("exepath").unwrap());
         if !exepath.exists() {
             eprintln!(
@@ -76,27 +86,26 @@ fn main() {
             );
             exit(1);
         }
-        let exestem = exepath.file_stem().unwrap().to_string_lossy();
+        let exestem = extract_exename_from_path(exepath).unwrap();
         let working_dir = tempdir().unwrap();
         let manifest_filepath = working_dir.path().join(format!(
             "{}{}",
             &exepath.file_name().unwrap().to_string_lossy(),
             ".manifest"
         ));
-        {
-            let mut manifest = File::create(&manifest_filepath).unwrap();
-            manifest
-                .write_all(generate_manifest(exestem.as_ref()).as_bytes())
-                .unwrap();
-        }
-        // No manifest -> 31 / valid manifest exists -> 0
+        create_manifest_file(&manifest_filepath, exestem.as_ref()).unwrap();
+        // No manifest -> returns 31 / valid manifest exists -> returns 0
         let validate_manifest_status = Command::new("mt")
-            .args(&["-nologo", 
+            .args(&[
+                "-nologo",
                 &format!("-inputresource:{}", &exepath.to_string_lossy()),
-                "-validate_manifest"
+                "-validate_manifest",
             ])
-            .status().unwrap();
-        let action = if validate_manifest_status.success() { "update" } else {
+            .status()
+            .unwrap();
+        let action = if validate_manifest_status.success() {
+            "update"
+        } else {
             eprintln!("{}: no valid manifest is found in this executable.  Embedding a manifest as the first....", "note".green());
             "output"
         };
