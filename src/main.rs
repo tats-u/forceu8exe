@@ -28,6 +28,19 @@ fn create_manifest_file(outpath: &Path) -> Result<(), std::io::Error> {
     return manifest.and_then(|mut m| m.write_all(generate_manifest().as_bytes()));
 }
 
+macro_rules! requires_mt {
+    () => {
+        if which("mt").is_err() {
+            eprintln!(
+                "{}: {} is not in PATH.  Run this tool from e.g. Native Tools Command Prompt.",
+                "error".red(),
+                "mt".green()
+            );
+            exit(1);
+        }
+    };
+}
+
 fn main() {
     if !cfg!(windows) {
         eprintln!(
@@ -37,14 +50,6 @@ fn main() {
         exit(1);
     }
 
-    if which("mt").is_err() {
-        eprintln!(
-            "{}: {} is not in PATH.  Run this tool from e.g. Native Tools Command Prompt.",
-            "error".red(),
-            "mt".green()
-        );
-        exit(1);
-    }
     let matches = App::new("forceu8exe")
         .version(&clap::crate_version!()[..])
         .subcommand(
@@ -65,6 +70,7 @@ fn main() {
         exit(1);
     }
     if let Some(ref matches) = matches.subcommand_matches("apply") {
+        requires_mt!();
         let exepath = Path::new(matches.value_of_os("exepath").unwrap());
         if !exepath.exists() {
             eprintln!(
