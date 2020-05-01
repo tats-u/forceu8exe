@@ -2,12 +2,12 @@ use clap::{App, Arg, SubCommand};
 use colored::*;
 use std::ffi::OsStr;
 use std::fs::File;
+use std::option::Option;
 use std::path::Path;
 use std::process::exit;
 use std::process::Command;
 use tempfile::tempdir;
 use which::which;
-use std::option::Option;
 
 use std::io::Write;
 
@@ -29,11 +29,15 @@ fn generate_manifest(exename: &str) -> String {
 
 fn create_manifest_file(outpath: &Path, exename: &str) -> Result<(), std::io::Error> {
     let manifest = File::create(outpath);
-    return manifest.and_then(|mut m| m.write_all(generate_manifest(exename).as_bytes()))
+    return manifest.and_then(|mut m| m.write_all(generate_manifest(exename).as_bytes()));
 }
 
-fn extract_exename_from_path(exepath: &Path) -> Option<std::borrow::Cow<'_, str>>  {
-    return exepath.file_stem().and_then(|s| Some(s.to_string_lossy()));
+fn extract_exename_from_path(exepath: &Path) -> Option<std::borrow::Cow<'_, str>> {
+    return if exepath.extension().unwrap_or_default() == "exe" {
+        exepath.file_stem().and_then(|s| Some(s.to_string_lossy()))
+    } else {
+        Some(exepath.to_string_lossy())
+    };
 }
 
 fn main() {
@@ -58,6 +62,12 @@ fn main() {
         .subcommand(
             SubCommand::with_name("apply").arg(Arg::with_name("exepath").required(true).index(1)),
         )
+        .subcommand(
+            SubCommand::with_name("manifest")
+                .arg(Arg::with_name("exepathorname").required(true).index(1))
+                .arg(Arg::with_name("output").required(true).index(2))
+                .arg(Arg::with_name("force").long("force").short("f")),
+        )
         .get_matches();
     if matches.subcommand_name().is_none() {
         eprintln!(
@@ -68,7 +78,7 @@ fn main() {
         exit(1);
     }
     if let Some(ref matches) = matches.subcommand_matches("apply") {
-        let exepath = Path::new(matches.value_of("exepath").unwrap());
+        let exepath = Path::new(matches.value_of_os("exepath").unwrap());
         if !exepath.exists() {
             eprintln!(
                 "{}: {} doesn't exist.",
@@ -131,5 +141,44 @@ fn main() {
                 exit(1);
             }
         }
+    } else if let Some(ref matches) = matches.subcommand_matches("manifest") {
+        let exepathorname_str = matches.value_of("exepathorname").unwrap();
+        let exepathorname = Path::new(&exepathorname_str);
+        let outputpath = Path::new(matches.value_of_os("output").unwrap());
+        let overwriting_allowed = matches.is_present("force");
+        let exename = extract_exename_from_path(&exepathorname).unwrap();
+        let outputfile_path = if outputpath.is_dir() {
+            if exepathorname.extension().map_or(false, |e| e == "exe") {
+                outputpath.join(format!("{}.exe.manifest", exename))
+            } else {
+                outputpath.join(format!(
+                    "{}.manifest",
+                    exepathorname.file_name().unwrap().to_string_lossy()
+                ))
+            }
+        } else {
+            std::path::PathBuf::from(outputpath)
+        };
+        if outputfile_path.is_file() && !overwriting_allowed {
+            eprintln!(
+                "{}: {} exists.  Add {} option if you'd like to override it.",
+                "error".red(),
+                outputfile_path.to_string_lossy().green(),
+                "-f".green(),
+            );
+            exit(1)
+        }
+        match create_manifest_file(&outputfile_path, &exename) {
+            Err(err) => {
+                eprintln!("{}: {}", "error".red(), err);
+                exit(1);
+            }
+            _ => {}
+        }
+        eprintln!(
+            "{}: succeeded to write the manifest to {}.",
+            "note".green(),
+            outputfile_path.to_string_lossy().green()
+        );
     }
 }
