@@ -21,6 +21,24 @@ cargo install --git https://github.com/tats-u/forceu8exe.git
 forceu8exe apply [path of .exe file]
 ```
 
+You can also output the manifest to a file like (e.g. `foobar.exe.manifest`):
+
+```pwsh
+forceu8exe manifest foobar.exe.manifest
+```
+
+```cmake
+# snip
+
+add_executable(
+    foobar
+    foobar.exe
+    foobar.exe.manifest # Append here
+)
+
+# snip
+```
+
 # License
 
 MIT
