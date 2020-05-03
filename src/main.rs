@@ -41,6 +41,19 @@ macro_rules! requires_mt {
     };
 }
 
+macro_rules! error_and_exit {
+    ($err:expr) => {
+        eprintln!("{}: {}", "error".red(), $err);
+        std::process::exit(1)
+    };
+}
+
+macro_rules! print_note {
+    ($note:expr) => {
+        eprintln!("{}: {}", "note".green(), $note)
+    };
+}
+
 fn main() {
     if !cfg!(windows) {
         eprintln!(
@@ -60,34 +73,35 @@ fn main() {
                 .arg(Arg::with_name("output").required(true).index(1))
                 .arg(Arg::with_name("force").long("force").short("f")),
         )
+        .subcommand(
+            SubCommand::with_name("apply-manifest")
+                .arg(Arg::with_name("in").required(true).index(1))
+                .arg(Arg::with_name("out").index(2))
+                .arg(Arg::with_name("force").long("force").short("-f")),
+        )
         .get_matches();
     if matches.subcommand_name().is_none() {
-        eprintln!(
-            "{}: This tool requires a subcommand.  Try {} to get the help.",
-            "error".red(),
+        error_and_exit!(format!(
+            "This tool requires a subcommand.  Try {} to get the help.",
             "-h".green()
-        );
-        exit(1);
+        ));
     }
+
     if let Some(ref matches) = matches.subcommand_matches("apply") {
         requires_mt!();
         let exepath = Path::new(matches.value_of_os("exepath").unwrap());
         if !exepath.exists() {
-            eprintln!(
-                "{}: {} doesn't exist.",
-                "error".red(),
+            error_and_exit!(format!(
+                "{} doesn't exist.",
                 exepath.to_string_lossy().green()
-            );
-            exit(1);
+            ));
         }
         if exepath.extension().unwrap_or_default() != OsStr::new("exe") {
-            eprintln!(
-                "{}: {} doen't end with {}.",
-                "error".red(),
+            error_and_exit!(format!(
+                "{} doen't end with {}.",
                 exepath.to_string_lossy().green(),
                 ".exe".green()
-            );
-            exit(1);
+            ));
         }
         let working_dir = tempdir().unwrap();
         let manifest_filepath = working_dir.path().join(format!(
@@ -108,7 +122,7 @@ fn main() {
         let action = if validate_manifest_status.success() {
             "update"
         } else {
-            eprintln!("{}: no valid manifest is found in this executable.  Embedding a manifest as the first....", "note".green());
+            print_note!("no valid manifest is found in this executable.  Embedding a manifest as the first....");
             "output"
         };
         let mut embed_manifest_result = Command::new("mt")
@@ -129,41 +143,34 @@ fn main() {
                 )
             }
             Err(ref err) => {
-                eprintln!("{}: {}", "error".red(), err);
-                exit(1);
+                error_and_exit!(err);
             }
         }
     } else if let Some(ref matches) = matches.subcommand_matches("manifest") {
         let outputpath = Path::new(matches.value_of_os("output").unwrap());
         let overwriting_allowed = matches.is_present("force");
         if outputpath.is_dir() {
-            eprintln!(
-                "{}: {} is a directory.  Pass a different path",
-                "error".red(),
-                outputpath.to_string_lossy().green(),
+            error_and_exit!(format!(
+                "{} is a directory.  Pass a different path",
+                outputpath.to_string_lossy().green())
             );
-            exit(1)
         }
         if outputpath.is_file() && !overwriting_allowed {
-            eprintln!(
-                "{}: {} exists.  Add {} option if you'd like to override it.",
-                "error".red(),
+            error_and_exit!(format!(
+                "{} exists.  Add {} option if you'd like to override it.",
                 outputpath.to_string_lossy().green(),
                 "-f".green(),
-            );
-            exit(1)
+            ));
         }
         match create_manifest_file(&outputpath) {
             Err(err) => {
-                eprintln!("{}: {}", "error".red(), err);
-                exit(1);
+                error_and_exit!(err);
             }
             _ => {}
         }
-        eprintln!(
-            "{}: succeeded to write the manifest to {}.",
-            "note".green(),
+        print_note!(format!(
+            "succeeded to write the manifest to {}.",
             outputpath.to_string_lossy().green()
-        );
+        ));
     }
 }
